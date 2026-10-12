@@ -11,6 +11,7 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    maven {url =uri("https://jitpack.io")}
 }
 
 val junitVersion = "5.12.1"
@@ -25,6 +26,14 @@ tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
 }
 
+tasks.withType<JavaExec>().configureEach {
+    // Keep automatic modules such as googleauth on IntelliJ's module path.
+    modularity.inferModulePath.set(false)
+    jvmArgumentProviders.add(CommandLineArgumentProvider {
+        mainModule.orNull?.let { listOf("--add-modules", it) } ?: emptyList()
+    })
+}
+
 application {
     mainModule.set("fr.btsciel")
     mainClass.set("fr.btsciel.HelloApplication")
@@ -36,6 +45,7 @@ javafx {
 }
 
 dependencies {
+    implementation("com.github.MoserBTS:totp:1.0.2")
     implementation("com.warrenstrange:googleauth:1.5.0")
     testImplementation("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")

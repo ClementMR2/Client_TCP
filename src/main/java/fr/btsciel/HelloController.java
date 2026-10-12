@@ -1,12 +1,12 @@
 package fr.btsciel;
 
+import com.astier.bts.totp.Totp;
 import fr.btsciel.exceptions.DiagnosticException;
 import fr.btsciel.modeles.Ipv4;
 import fr.btsciel.multicast_diffusion.MulticastDiffusion;
 import fr.btsciel.outils.ScanInterfaces;
 import fr.btsciel.tcp.TCPClient;
-import fr.btsciel.totp.Totp;
-import javafx.application.Platform;
+import com.astier.bts.totp.Totp;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.scene.shape.Circle;
@@ -30,16 +30,17 @@ public class HelloController implements Initializable {
     public ChoiceBox<Ipv4> choiceBoxInterfaces;
     public static TCPClient tcp;
     static boolean enRun = false;
+    static MulticastDiffusion multicastDiffusion;
+    static String interfaceName;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        verifierTotp();
-
         voyant.setFill(RED);
         connecter.setDisable(false);
         deconnecter.setDisable(true);
 
         getInterfaces();
+        verifierTotp();
 
         connecter.setOnAction(_ -> this.connecter());
         deconnecter.setOnAction(_ -> this.deconnecter());
@@ -47,17 +48,26 @@ public class HelloController implements Initializable {
         TextFieldRequette.setOnAction(_ -> this.envoyer());
         choiceBoxInterfaces.getSelectionModel().selectedItemProperty().addListener(
                 (_, _, nouvelleValeur) -> {
-                    if (nouvelleValeur == null) {
-                        return;
-                    };
+                    Ipv4 monInterface = nouvelleValeur;
+                    if (monInterface != null) {
+                        System.out.println("\t[ Interfaces ]");
+                        System.out.printf("""
+                            
+                            Type : %s
+                            Nom : %s
+                            IP : %s
+                            
+                            %n""", monInterface.interfaceType(), monInterface.interfaceName(), monInterface.ip());
+                    }
 
-                    new Thread(() -> {
-                        getConfig(nouvelleValeur);
-                    }).start();
+                    interfaceName = monInterface.interfaceName();
+                    new Thread(this::getConfig).start();
                 });
     }
 
     public boolean verifierTotp() {
+        Totp totp = new Totp();
+
         TextInputDialog dialog = new TextInputDialog();
         dialog.setTitle("Vérification TOTP");
         dialog.setHeaderText("Saisissez votre code d'authentification.");
@@ -66,7 +76,11 @@ public class HelloController implements Initializable {
         while (true) {
             Optional<String> saisie = dialog.showAndWait();
             if (saisie.isEmpty()) return false;
-            if (Totp.testTotp(saisie.get())) return true;
+            try {
+                if (totp.testCodeTOTP(Integer.parseInt(saisie.get()))) return true;
+            } catch (Exception e) {
+                System.err.println(DiagnosticException.afficheException(e));
+            }
 
             dialog.setHeaderText("Code invalide. Réessayez.");
             dialog.getEditor().clear();
@@ -82,18 +96,14 @@ public class HelloController implements Initializable {
     }
 
 
-    private void getConfig(Ipv4 monInterface) {
+    private void getConfig() {
         try {
-            MulticastDiffusion diffusion = new MulticastDiffusion(monInterface.interfaceName());
-            Platform.runLater(() -> {
-                if (!monInterface.equals(choiceBoxInterfaces.getValue()) || enRun) return;
-
-                TextFieldIP.setText(diffusion.connexion.addressAsString());
-                TextFieldPort.setText(String.valueOf(diffusion.connexion.portTCP()));
-            });
+            multicastDiffusion = new MulticastDiffusion(interfaceName);
+            Thread.sleep(500);
+            TextFieldIP.setText(multicastDiffusion.connexion.addressAsString());
+            TextFieldPort.setText(String.valueOf(multicastDiffusion.connexion.portTCP()));
         } catch (Exception ex) {
-            String diagnostic = DiagnosticException.afficheException(ex);
-            Platform.runLater(() -> TextAreaReponses.appendText(diagnostic + "\n"));
+            System.err.println(DiagnosticException.afficheException(ex));
         }
     }
 

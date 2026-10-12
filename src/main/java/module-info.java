@@ -5,6 +5,7 @@ module fr.btsciel {
     requires java.net.http;
     requires com.google.gson;
     requires googleauth;
+    requires totp.main;
 
     opens fr.btsciel to javafx.fxml;
     opens fr.btsciel.modeles to com.google.gson;
